@@ -1,0 +1,78 @@
+<!DOCTYPE html><html lang="en-US"><head><META http-equiv="Content-Type" content="text/html; charset=UTF-8"><META content="width=device-width, initial-scale=1" name="viewport"><META name="description" content="Post page.."><META http-equiv="X-UA-Compatible" content="IE=edge"><title>Creating branches from Github issues</title><link rel="stylesheet" href="./style1700750441069.css"></head><body><a href="#main-content" class="sr">Skip to main content</a><header id="p-hdr"><nav id="p-hdr-nav"><a href="./index.html" id="p-sname">Chris Berragan</a></nav></header><main id="main-content"><article id="p-c" itemscope="true" itemtype="http://schema.org/BlogPosting"><header id="p-chdr"><time class="date" datetime="2019-07-20T10:30:00+02:00">20th July 2019</time><h1 id="p-t">Creating branches from Github issues</h1></header><p>
+          It occurred to me recently that the majority of Git
+          branches that I create have the same name as the Github
+          Issue that they are for. To speed up the process, I put
+          together a simple extension for Magit that automates this
+          via the <a href="https://hub.github.com/">hub</a> cli tool.
+        </p><p>
+          There are five key components to this:
+        </p><ol class="ol"><li>A function to get a list of issues from Github</li><li>An 'Issue Popup' to select an issue from</li><li>A function to format the selected issue as a branch name</li><li>A Magit mini-buffer to create a branch from the Issue Popup</li><li>Assigning a Magit suffix to the magit-branch popup</li></ol><h2>Prerequisites</h2><p>
+            This assumes that you have <a href="https://hub.github.com/">hub</a> installed
+            and are using the following packages in Emacs:
+          </p><ul class="ul"><li>
+              <a href="https://github.com/abo-abo/swiper#ivy">Ivy</a> (to select from a list of issues)
+            </li><li>
+              <a href="https://github.com/magit/magit">Magit</a> (for Git integration)
+            </li></ul><h2>Get a list of Github Issues</h2><p>
+            First we'll call the <span class="hl">hub issue</span> command to
+            fetch a list of Github issues. This will be formatted so
+            that we can parse it to get the issue number, title, and
+            labels for each of them using the following symbols:
+          </p><p>
+            <dl class="dl in"><dt>%I</dt><dd>Issue number</dd><dt>%t</dt><dd>Title</dd><dt>%L</dt><dd>Labels (comma-separated)</dd></dl>
+          </p><p>
+            In this case, I've separated each item in the format
+            string with a vertical bar, which will be used later to
+            split it into the necessary parts.
+          </p><pre><code>(defun my-get-issues-list ()
+  "Get a list of GIT-ISSUE-NAMEs from Github.
+Example: '(\"38 | Test issue | dev\")."
+  (butlast
+   (split-string
+    (shell-command-to-string
+      (concat "hub issue" " -f \"%I | %t | %L\"^M"))
+      "\\(\r\n\\|[\n\r]\\)")))</code></pre><h2>Display a popup to select an issue from</h2><p>
+            We then use Ivy to display the list of issues in the mini-buffer:
+          </p><pre><code>(defun my-git-list-issues ()
+  "Display the list of Github issues to create a branch from."
+  (interactive "p")
+  (let ((git-issue (ivy-read "Find issue: "
+                             (my-get-issues-list)
+                             :matcher 'ivy--re-filter
+                             :require-match t)))
+    (my-convert-to-git-branch-name git-issue)))</code></pre><h2>Format an issue as a branch name</h2><p>
+            Now that we can select an issue, it needs to be
+            formatted as a Git branch. A common pattern is to prefix
+            it with the main label followed by a forward-slash, then
+            the title and issue number after it in snake-case.
+          </p><p>
+            For example:<br>
+            <span class="hl">feature/magit-github-issue-popup-102</span>
+          </p><pre><code>(defun my-convert-to-git-branch-name (GIT-ISSUE-NAME)
+  "Convert GIT-ISSUE-NAME to branch name.
+Example: \"38 | Test issue | dev\" =&gt; \"dev/test-issue-38\"."
+  (cl-destructuring-bind
+    (issue-no issue-name issue-labels)
+    (split-string GIT-ISSUE-NAME "|")
+  (downcase
+   (replace-regexp-in-string
+    " "
+    "-"
+    (concat (string-trim issue-labels)
+            "/"
+            (string-trim issue-name)
+            "-"
+            (string-trim issue-no))))))</code></pre><h2>Display a prompt to create a branch</h2><p>
+            Finally we create a modified version of Magit's
+            <span class="hl">magit-branch-create</span> function to display a
+            popup that first asks which existing branch to branch
+            from, then displays our 'Issue Popup' to select the
+            branch name to create.
+          </p><pre><code>;;;###autoload
+(defun my-magit-branch-and-checkout-from-github-issues (STARTING-POINT NEW-BRANCH-NAME)
+  "Create and checkout NEW-BRANCH-NAME at STARTING-POINT from selected Github issue."
+  (interactive (list (magit-read-starting-point "Select branch" nil nil)
+                     (magit-read-string-ns "Create branch for issue" (my-git-list-issues))))
+  (magit-call-git "checkout" "-b" NEW-BRANCH-NAME STARTING-POINT)
+  (magit-refresh)
+  (message (concat "Created and checked out branch: " NEW-BRANCH-NAME)))</code></pre></article></main><footer><nav id="p-fnav"><ul><li><span class="sr">First page</span><span aria-hidden="true">&larr; PREV</span></li><li><a href="#p-hdr">BACK TO TOP</a></li><li><a href="./solid-principles-with-clojure.html">NEXT &rarr;</a></li></ul></nav></footer></body></html>

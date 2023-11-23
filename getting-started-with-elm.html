@@ -1,0 +1,106 @@
+<!DOCTYPE html><html lang="en-US"><head><META http-equiv="Content-Type" content="text/html; charset=UTF-8"><META content="width=device-width, initial-scale=1" name="viewport"><META name="description" content="Post page.."><META http-equiv="X-UA-Compatible" content="IE=edge"><title>Getting Started With Elm</title><link rel="stylesheet" href="./style1700750441069.css"></head><body><a href="#main-content" class="sr">Skip to main content</a><header id="p-hdr"><nav id="p-hdr-nav"><a href="./index.html" id="p-sname">Chris Berragan</a></nav></header><main id="main-content"><article id="p-c" itemscope="true" itemtype="http://schema.org/BlogPosting"><header id="p-chdr"><time class="date" datetime="2015-01-08T09:30:00+01:00">8th January 2015</time><h1 id="p-t">Getting Started With Elm</h1></header><p>
+            <a href="http://elm-lang.org/">Elm</a> is a purely functional programming language, very
+            similar to Haskell, that compiles into Javascript and simplifies the process of
+            creating user interfaces. It includes some well thought out core libraries for
+            working with data structures like Lists, Dicts, and Sets, and for managing
+            Signals, which are fundamental to Elm's Functional Reactive Programming approach
+            to managing changes in state. The package manager and module system are pleasant
+            to use, and it also provides a useful <span class="hl">elm-reactor</span> command that serves your
+            project on localhost and automatically builds on any changes, making it
+            incredibly quick and easy to get started.
+        </p><p>
+            You can run the following code snippets either from the
+            <a href="http://elm-lang.org/try/">online editor</a> or by
+            <a href="http://elm-lang.org/install/">installing it</a>, and then creating a directory
+            with a Main.elm file in it and running <span class="hl">elm-reactor</span>.
+        </p><h2>Hello World!</h2><p>
+            Here's the standard Hello World using only the core libraries, and demonstrating
+            the module system, the type annotations, and the left pipe operator <span class="hl">&lt;|</span> that is
+            used for evaluating the <span class="hl">Text.fromString "Hello World!"​</span> expression before
+            passing it to the <span class="hl">leftAligned</span> function.
+        </p><pre><code>import Graphics.Element exposing (Element, leftAligned)
+import Text
+
+main : Element
+main = leftAligned &lt;| Text.fromString "Hello World!"</code></pre><p>
+            As you can see, everything is explicitly defined with none of the global
+            variables that you encounter with Javascript.  The main function is the point at
+            which the app is evaluated altogether to display on the screen, and as such must
+            return an Element type, refering to the HTML Element that will end up in the DOM.
+        </p><h2>Signal (Int, Int)</h2><p>
+            The following example (taken from <a href="http://elm-lang.org/examples/">http://elm-lang.org/examples</a>) demonstrates the
+            Signal concept that forms the basis of Elm's Functional Reactive Programming
+            approach:
+        </p><pre><code>import Graphics.Element exposing (Element, show)
+import Mouse
+
+main : Signal Element
+main =
+    Signal.map show Mouse.position</code></pre><p>
+            In this case the main function returns a Signal Element, which can essentially
+            be thought of as a list of Html Elements at each snapshot in time that an
+            event has occured.  The Mouse library is used to get the position of the cursor, which
+            returns a type of <span class="hl">Signal (Int, Int)</span> where Signal can again be considered to be
+            a list of the <span class="hl">(Int, Int)</span> tuple that represents the x and y coordinates of
+            the mouse at various points in time, for instance:
+        </p><pre><code>[(0, 0)]                               -- Starting point at x = 0 and y = 0
+
+[(0, 0), (10, 0)]                      -- Then moved to the right
+[(0, 0), (10, 0), (10, 20)]            -- Then moved down
+[(0, 0), (10, 0), (10, 20), (5, 10)]   -- Then moved to the left and up</code></pre><p>
+            This is then mapped to the <span class="hl">show</span> function that returns the value as an Element:
+        </p><pre><code>[(0, 0)]
+[(0, 0), (10, 0)]
+[(0, 0), (10, 0), (10, 20)]
+[(0, 0), (10, 0), (10, 20), (5, 10)]</code></pre><p>
+            The outcome in the browser is the last item of the Signal list, 
+            representing the current state of the DOM body.
+        </p><h2>1 = 1</h2><p>
+            An important aspect of functional programming is to understand that the equals
+            operator (=) is not used for assigning something to a variable, but actually
+            signifies equality between the left and right sides just as it does in
+            mathematical equations:
+        </p><pre><code>-- For example, in maths:
+-- 5 = 2 + 3
+-- .. so an addition function in Elm would be:
+add x y = x + y
+-- which evaluates to:
+add 2 3 = 2 + 3</code></pre><p>
+            This means that the common idioms in imperative languages can't be used, such as
+            <span class="hl">for (var = i; i &lt; list.length; i += 1) {...}</span>. Instead, lists of items are
+            transformed by 'mapping' them to functions to return a new list with a different
+            state, for example:
+        </p><pre><code>-- Define a list of ones
+ones = [1, 1, 1]
+twos = List.map (\one -&gt; one * 2) ones</code></pre><p>
+            This example uses a simple lambda function to double each item in the list.
+            These are often useful for small functions that you are unlikely to use again.
+            Here's how it would be written with a named function:
+        </p><pre><code>-- Define a list of ones
+ones = [1, 1, 1]
+double it = it * 2
+twos = List.map double ones</code></pre><h2>Precedence</h2><p>
+            As with maths, you can specify what should be evaluated first with parentheses:
+        </p><pre><code>addAndHalve x y = (x + y) / 2</code></pre><p>
+            But Elm also provides two pipe operators (<span class="hl">|&gt;</span> and <span class="hl">&lt;|</span>) for different
+            directions of evaluation:
+        </p><pre><code>-- Evaluates x + y first then halves the result
+addAndHalve x y = x + y |&gt; / 2
+
+-- Evaluates x + y then passes the result to the halve function which returns
+-- the final result
+halve x = x / 2
+addAndHalve x y = halve &lt;| x + y</code></pre><p>
+            These might look strange, but it can be useful when describing a certain set of
+            transformations in a particlular order:
+        </p><pre><code>blueDot =
+circle 10
+    |&gt; filled blue
+    |&gt; move (20,20)
+    |&gt; scale 2</code></pre><p>
+            This example evaluates a circle with radius 10 and applies it to the filled
+            function to fill it with the colour blue, then takes this evaluation of this
+            blue circle and applies it to the move function to move by (20, 20) and
+            finally takes this evaluation of the blue circle that has been moved by
+            (20, 20) and applies it to the scale function to multiply the scale by 2.
+        </p></article></main><footer><nav id="p-fnav"><ul><li><a href="./functional-reactive-programming.html">&larr; PREV</a></li><li><a href="#p-hdr">BACK TO TOP</a></li><li><a href="./frp-in-javascript.html">NEXT &rarr;</a></li></ul></nav></footer></body></html>

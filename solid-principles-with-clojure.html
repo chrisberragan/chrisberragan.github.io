@@ -1,0 +1,155 @@
+<!DOCTYPE html><html lang="en-US"><head><META http-equiv="Content-Type" content="text/html; charset=UTF-8"><META content="width=device-width, initial-scale=1" name="viewport"><META name="description" content="Post page.."><META http-equiv="X-UA-Compatible" content="IE=edge"><title>S.O.L.I.D. Principles with Clojure and Python</title><link rel="stylesheet" href="./style1700750441069.css"></head><body><a href="#main-content" class="sr">Skip to main content</a><header id="p-hdr"><nav id="p-hdr-nav"><a href="./index.html" id="p-sname">Chris Berragan</a></nav></header><main id="main-content"><article id="p-c" itemscope="true" itemtype="http://schema.org/BlogPosting"><header id="p-chdr"><time class="date" datetime="2018-02-05T09:30:00+01:00">5th February 2018</time><h1 id="p-t">S.O.L.I.D. Principles with Clojure and Python</h1></header><p>The S.O.L.I.D. Principles that have been promoted by Robert C. Martin provide an excellent guideline for building software that will be easy to maintain in the long term.</p><h2>Single Responsibility Principle</h2><p>It can often be tempting to handle several different operations in a single class or function, but making changes to this later on could easily cause difficulty as the outcomes of every existing use case would have to be considered. By restricting them to only one job, you can still create the desired outcome by composing them together.</p><pre><code>(def events [{:type :talk} {:type :fun-run} {:type :dinner}])
+                
+;; Instead of handling two jobs here:
+(defn cancel-and-notify [event]
+    ;; ..)
+
+(cancel-and-notify {:type :dinner})
+
+;; .. we can split them out into separate functions
+;; and compose them together
+(defn cancel [event]
+    ;; ..)
+(defn notify [event]
+    ;; ..)
+
+(notify (cancel {:type :dinner}))</code></pre><h2>Open Closed Principle</h2><p>The above example neglects to consider the maintainability of this cancel function, and others like it. Adding a new type of event would involve adding a new case inside of the 'cancel' function, and inside any others, (for example a 'book' function).</p><p>The open/closed principle emphasises that you should be able to add new entities, but not modify existing ones. Clojure has an excellent means of doing this through either protocols or multimethods:</p><pre><code>;; Instead of handling each case inside of a single function (that has to be
+;; modified in order to add new cases):
+(defn cancel [event]
+    (case (:type event) 
+        :talk ;; ..
+        :fun-run ;; ..
+        :dinner ;; ..
+        ))</code></pre><pre><code>;; We can define a multimethod that can be extended on a case by case basis
+;; events-library-namespace.events
+(defmulti cancel :type)
+
+(defmethod cancel :event
+    [event]
+    ;;..
+    )
+
+(defmethod cancel :fun-run
+    [event]
+    ;;..
+    )
+
+;; This module can now be extended from another namespace, for example if it was
+;; included from another library:
+;; another-namespace.events
+(defmethod cancel :dinner
+    [event]
+    ;;..
+    )</code></pre><h2>Liskov Substitution Principle</h2><p>According to L.S.P. when making a subclass it should be possible to change instances of them with instances of the parent class.</p><p>One of the best explanations of this that I've found is <a href="http://maksimivanov.com/posts/liskov-substitution-principle">here</a>, which uses the example of a Duck base class that implements a 'quack' method, and a MechanicalDuck subclass that implements it, but requires a battery property to be defined. The outcomes of calling this method on an instance of each class would be different based on the state of the battery property, and would, therefore, mean that they could not be interchanged while maintaining the same behaviour.</p><p>A classic example of this is with a Square class extending a Rectangle. Since a square is just a rectangle where the width is the same as the height, you could implement methods for setting the width and height that would automatically set the height/width:</p><pre><code>class Rectangle:
+
+    def set_height(self, height):
+        self.height = height;
+
+    def set_width(self, width):
+        self.width = width;
+
+
+class Square(Rectangle):
+
+    def set_height(self, height):
+        self.height = height;
+        self.width = width;
+
+    def set_width(self, width):
+        self.height = height;
+        self.width = width;</code></pre><p>But this could confuse someone calling one of the methods on the square, as when calling set_height they would not be expecting the width to be changed and vice-versa.</p><p>A better abstraction might be to have a more generic Shape class that implements a set_dimensions method:</p><pre><code>class Shape:
+
+    def set_dimensions(self, height, width):
+        self.height = height;
+        self.width = width;
+
+
+class Rectangle(Shape):
+
+    def set_dimensions(self, height, width):
+        self.height = height;
+        self.width = width;
+
+
+class Square(Shape):
+
+    def set_dimensions(self, size):
+        self.height = size;
+        self.width = size;</code></pre><h2>Interface Segregation Principle</h2><p>When defining a class, you only really want the methods that that particular class will need. An AdminUser class that extends a User class might need a login method, whereas an AnonymousUser class would not. An INamed interface could therefore be defined that provides the change-name method for only the AdminUser class to inherit, while the AnonymousUser class would not require it at all. This principle mostly applies to typed languages, but in Clojure an equivalent can be found in Protocols:</p><pre><code>;; Rather than bundling all of the methods into the IUser protocol:
+(defprotocol IUser
+    (change-language [user])
+    (change-name [user]))
+
+;; Which would mean that the anonymous user would also have to implement a
+;; change-name method, which doesn't make sense when you're anonymous:
+(defrecord AnonymousUser [user]
+    IUser
+    (change-language [language]
+        (assoc user :language language))
+    (change-name [name]
+        (assoc user :name name)))
+
+
+;; Instead an INamed protocol can be defined that only the AdminUser
+;; needs to implement
+(defprotocol IUser
+    (change-language [language]))
+
+(defprotocol INamed
+    (change-name [name]))
+
+(defrecord AnonymousUser [user]
+    IUser
+    (change-language [language]
+        (assoc user :language language)))
+
+(defrecord AdminUser [user]
+    IUser
+    (change-language [language]
+        (assoc user :language language))
+    INamed
+    (change-name [name]
+        (assoc user :name name)))</code></pre><h2>Dependency Inversion Principle</h2><p>It can be easy to define modules that depend on a lower level module leading to them to be tightly coupled to a specific implementation. Clojure provides some built-in options for avoiding this coupling, through features such as protocols and multimethods, but other languages can also achieve this through solutions such as Dependency Injection, such as by passing higher-order functions to handle the lower-level logic.</p><pre><code>;; Instead of calling a specific function per type
+(defn validate-move-pawn [x y]
+    ;; ..)
+
+(defn validate-move-bishop [x y]
+    ;; ..)
+
+(defn validate-move-queen [x y]
+    ;; ..)
+
+
+;; .. which would require the modules that are calling them
+;; to know about them specifically, making the code less flexible:
+
+(map #(case (:type %)
+    :pawn (validate-move-pawn)
+    :bishop (validate-move-bishop)
+    :queen (validate-move-queen)) pieces)
+
+;; It's preferable to keep the lower level code seperated out, so that
+;; it doesn't have to know about the implementation, for instance through
+;; with a Protocol:
+
+(defprotocol IPiece
+    (validate-move [piece]))
+
+(defrecord Pawn [piece]
+    IPiece
+    (validate-move [x y]
+        ;; ..))
+
+(defrecord Bishop [piece]
+    IPiece
+    (validate-move [x y]
+        ;; ..))
+
+(defrecord Queen [piece]
+    IPiece
+    (validate-move [x y]
+        ;; ..))
+
+(def pieces [(Pawn.) (Queen.) (Bishop.)])
+    ;; Note there is no need for any type checks
+    (map #(validate-move 2 3) pieces)</code></pre></article></main><footer><nav id="p-fnav"><ul><li><a href="./creating-branches-from-github-issues.html">&larr; PREV</a></li><li><a href="#p-hdr">BACK TO TOP</a></li><li><a href="./functional-reactive-programming.html">NEXT &rarr;</a></li></ul></nav></footer></body></html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html><html lang="en-US"><head><META http-equiv="Content-Type" content="text/html; charset=UTF-8"><META content="width=device-width, initial-scale=1" name="viewport"><META name="description" content="Post page.."><META http-equiv="X-UA-Compatible" content="IE=edge"><title>Functional Reactive Programming</title><link rel="stylesheet" href="./style1700750441069.css"></head><body><a href="#main-content" class="sr">Skip to main content</a><header id="p-hdr"><nav id="p-hdr-nav"><a href="./index.html" id="p-sname">Chris Berragan</a></nav></header><main id="main-content"><article id="p-c" itemscope="true" itemtype="http://schema.org/BlogPosting"><header id="p-chdr"><time class="date" datetime="2015-03-19T09:30:00+01:00">19th March 2015</time><h1 id="p-t">Functional Reactive Programming</h1></header><p>
+            In an attempt to bring some of the benefits of Elm to React, you can use
+            Immutable JS to ensure that all state is immutable and Bacon JS to enable
+            streams of events to handle the controllers. This approach differs slightly from
+            the Elm Architecture approach in that the controllers are completely removed
+            from the views (this approach doesn't need a single onClick or similiar
+            attribute on any DOM elements).
+        </p><p>
+            
+            Elm's approach to UIs is becoming increasingly popular for it's simplicity,
+            clarity, and reliability (although the excellent type system helps somewhat here).
+            In particular, having the state in a single immutable data-structure helps to
+            avoid trippiing over yourself as the state changes as you no longer have to
+            worry about the order in time that changes have been made to reason about what
+            the result should be. Reactive events (Streams in Bacon JS and Signals in Elm)
+            enable you to treat events as values in time that can be filtered to create new streams
+            and mapped to alter the values.  With the controllers handled like this, it's simple
+            to understand what the outcome of various events should be.  Finally using a reactive
+            DOM library (VDOM in the case of Elm) not only has perfomance benefits thanks to the
+            diffing of the changes that should be made to the DOM, but also provides a simple abstraction
+            layer that ties in nicely with the event streams to make the view layer simply another
+            transformation on the state (albeit one that has an effect that is rendered on the screen).
+        </p><h2>Models Views Controllers</h2><p>
+            The basic pattern is simply a variation on the classic MVC pattern.
+        </p><h3>Controllers</h3><p>
+            Starting with the controllers, the selectors for the views are stored together so that 
+            they can be used by both the controllers and the views.  A Bacon Event Stream
+            is created from events on the document that are then filtered by the ID or class
+            and mapped to a functor that performs an action on the previous state:
+        </p><pre><code>var SELECTORS = {
+    updateMessageFieldId: 'update_message_field'
+}
+
+// Events
+var keyups = Bacon.fromEvent(document, 'keyup');
+    
+// Controllers
+var updateFieldEvents = keyups.filter(function (event) {
+    // Filter by the ID of the element
+    return event.target.id === SELECTORS.updateMessageFieldId;
+})
+.map(function (event) {
+    // Return a functor to alter the previous state
+    return function (previousState) {
+        return previousState.set('message', event.target.value);
+    };
+});
+// The main eventStream that merges all Controller streams into one
+var eventStream = Bacon.mergeMany([
+    updateFieldEvents
+])</code></pre><h3>Models</h3><p>
+            The models define an initial state and a current state stream that is defined by
+            taking the eventStream and folding (eventStream.scan) it over the initial state
+            to perform the actions on it:
+        </p><pre><code>// Define the initial state of the app
+const initialState = I.fromJS({
+    message: 'Hello World!'
+});
+
+const currentStateStream = eventStream.scan(
+    initialState,
+    function (previousState, eventAction) {
+        // Call the functor from the controller
+        // to return a new altered version of the previous state
+        return eventAction(previousState);
+    }
+);</code></pre><h3>Views</h3><p>
+            Finally the currentStateStream is used to call Reacts render function to update
+            the DOM with the evaluation of the React views with the updated state:
+        </p><pre><code>currentStateStream.onValue(function (currentState) {
+    // Render the main React component on changes to the state to update the UI
+    render();
+});</code></pre></article></main><footer><nav id="p-fnav"><ul><li><a href="./solid-principles-with-clojure.html">&larr; PREV</a></li><li><a href="#p-hdr">BACK TO TOP</a></li><li><a href="./getting-started-with-elm.html">NEXT &rarr;</a></li></ul></nav></footer></body></html>

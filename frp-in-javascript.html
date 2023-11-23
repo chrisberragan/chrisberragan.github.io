@@ -1,0 +1,48 @@
+<!DOCTYPE html><html lang="en-US"><head><META http-equiv="Content-Type" content="text/html; charset=UTF-8"><META content="width=device-width, initial-scale=1" name="viewport"><META name="description" content="Post page.."><META http-equiv="X-UA-Compatible" content="IE=edge"><title>FRP in Javascript</title><link rel="stylesheet" href="./style1700750441069.css"></head><body><a href="#main-content" class="sr">Skip to main content</a><header id="p-hdr"><nav id="p-hdr-nav"><a href="./index.html" id="p-sname">Chris Berragan</a></nav></header><main id="main-content"><article id="p-c" itemscope="true" itemtype="http://schema.org/BlogPosting"><header id="p-chdr"><time class="date" datetime="2014-06-03T10:30:00+02:00">3rd June 2014</time><h1 id="p-t">FRP in Javascript</h1></header><h2>What is Functional Reactive Programming?</h2><p>Functional Reactive Programming enables a much simpler way to deal with events. With Bacon JS, events are separate from the views and models as a stream of values in time. These streams can be thought of as lists of values that can then be mapped to transformation functions that model the data before passing to the views to render. This requires a different mindset to the typical imperative style of UI programming as rather than mutating the state throughout the code, changes are represented as new state objects that are passed down through the views.</p><p>A very simple example of this relationship between events and state is an event stream that listens to clicks and maps each click to the value 1. The resulting list (or stream) of 1s at each point in time that the event is fired can then be reduced with a Bacon JS scan function to add them all together, thereby resulting in a state representing the number of times something has been clicked.</p><pre><code>// The value from the event stream can be thought of as a list:
+eventStream = []
+
+// As the events come in (for instance an 'Add 1' button is clicked), 1 is added to the list
+eventStream = [1]             // Click!
+eventStream = [1, 1]          // Click!
+
+// The values can be reduced by adding the individual items together:
+eventStream = [1, 1, 1]       // = 3
+eventStream = [1, 1, 1, 1]    // = 4
+eventStream = [1, 1, 1, 1, 1] // = 5</code></pre><p>The benefits of this may not be immediately apparent, but this can greatly simplify your asynchronous code by composing <a href="http://en.wikipedia.org/wiki/Pure_function/">pure functions</a> around the values from the event stream in a very easy to read manner, rather than chaining callbacks together (that can become very difficult to maintain) and mutating the state of variables (leading to <a href="http://en.wikipedia.org/wiki/Side_effect_(computer_science)">side effects</a> that can produce unexpected bugs).</p><p>I highly advise watching the following presentation by Phillip Roberts to help gain a clearer insight:</p><div class="vid"><iframe title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" src="https://www.youtube-nocookie.com/embed/jIsxcXBWthI"></iframe></div><h2>When is it useful</h2><p>Functional Reactive Programming is useful in almost any case that deals with realtime, event-driven behaviour. Examples of this would be computer games (<a href="http://philipnilsson.github.io/badness/">like the classic 'Snake' game</a>), realtime charts, spreadsheets, and could also be handy on the server side for background processes.</p><h2>What is BaconJS?</h2><p>Bacon JS is a library for Javascript that provides methods like merge, combine, and flatMapLatest for handling multiple event streams, and functions like map and filter for transforming and filtering the streams.</p><h2>Simple Example</h2><p>Below is an adaptation of the simple plus/minus demo from the Bacon JS Docs to include key presses as additional event streams, tied-in with the time-based visual that Phillip Roberts used in his talk:</p><h3>HTML</h3><pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"&gt;&lt;/script&gt;
+        &lt;script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/bacon.js/0.7.10/bacon.min.js"&gt;&lt;/script&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;button id="plus"&gt;Plus&lt;/button&gt;
+        &lt;button id="minus"&gt;Minus&lt;/button&gt;
+        &lt;div id="counter"&gt;&lt;/div&gt;
+    &lt;/body&gt;
+&lt;/html&gt;</code></pre><h3>Javascript</h3><pre><code>var all_key_downs = jQuery(document).asEventStream('keydown');
+
+// Click Events
+var click_plus = jQuery('#plus').asEventStream('click');
+var click_minus = jQuery('#minus').asEventStream('click');
+
+// Key Events
+var key_plus = all_key_downs.filter(function (e) { return e.keyCode === 187 &amp;&amp; e.shiftKey; });
+var key_minus = all_key_downs.filter(function (e) { return e.keyCode === 189 &amp;&amp; e.shiftKey; });
+
+var counter = click_plus
+    .map(1)                                       // Map click_plus to 1
+    .merge(key_plus.map(1))                       // Map key_minus to -1
+    .merge(click_minus.map(-1))                   // Map click_minus to -1
+    .merge(key_minus.map(-1))                     // Map key_minus to -1
+    .scan(0, function (x, y) { return x + y; });
+
+// Assign the result of variable counter to dom element with class of 'counter'
+counter.assign(jQuery('#counter'), 'text');</code></pre><p>
+                    Starting out, the streams will all be empty except for the scan stream which will begin with an initial 0 value passing through it.
+                </p><p>
+                    <img class="img" src="imgd57bda9b-96c2-4d07-9f64-7af7ff3161c8.png" alt="Screenshot of the initial scan stream with a single 0 passing through it (which represents the initial state of the counter).">
+                </p><p>Then whenever the '+'' key or the '+' button are pressed, the plus stream will show a "1" passing through it which is then mirrored in the merge stream and added up in the scan stream (5 4 3 2 1 0).</p><p>
+                    <img class="img" src="img48b0470f-b935-4ca1-ba87-36fb956caa5a.png" alt="Screenshot of the pluses stream after pressing the 'Plus' button several times - the pluses stream has a series of '1's in it as well as the merge stream, and the scan stream has the sum of the '1's adding up to '0 1 2 3 4 5' and so on.">
+                </p><p>Whenever the '-'' key or the '-' button are pressed, the minus stream will show a "-1" passing through it which is also mirrored in the merge stream alongside the "1"s and then the scan stream will minus these from whatever the last value was (-2 -1 0 1 2 3 4 5 4 3 2 1 0).</p><p>
+                    <img class="img" src="img6ad91eb1-b22c-490e-8993-82bd4bedeea8.png" alt="Screenshot of the minuses stream after pressing the 'Minus'button several times - the minuses stream has a series of '-1's in it as well as the merge stream, which now has both '1's and '-1's in a series like '-1 -1 -1 -1 -1 -1 -1      1 1 1 1 1     0', and the scan stream showing a sum of both '1's and '-1's displayed as '-2 -1 0 1 2 3 4        5 4 3 2 1    0'">
+                </p><p>The counter just shows whatever the last value of the scan stream is - so each point in the streams jsut represents a moment in time that can be assigned to an element to display it.</p></article></main><footer><nav id="p-fnav"><ul><li><a href="./getting-started-with-elm.html">&larr; PREV</a></li><li><a href="#p-hdr">BACK TO TOP</a></li><li><span class="sr">Last page</span><span aria-hidden="true">NEXT &rarr;</span></li></ul></nav></footer></body></html>
